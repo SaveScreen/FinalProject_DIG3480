@@ -9,6 +9,11 @@ public class RubyController : MonoBehaviour
     public float speed;
     public float timeinvincible;
 
+    //For the timer.
+    public float timer;
+    public float resettimer;
+    public Text timeleft;
+
     //   \/ DO NOT TOUCH IN INSPECTOR!!!
     public bool isinvincible;
     public bool youwin;
@@ -29,7 +34,7 @@ public class RubyController : MonoBehaviour
     public AudioClip throwsound;
     public ParticleSystem healthparticle;
     public ParticleSystem hurtparticle;
-    private int myscore;
+    public int myscore;
     public GameObject winmessage;
     public GameObject losemessage;
     public GameObject bgm;
@@ -37,6 +42,10 @@ public class RubyController : MonoBehaviour
     public GameObject winmusic;
     public GameObject losemusic;
     private SpriteRenderer spritedisable;
+    private Scene currentscene;
+    private bool turnoffwalking;
+    private float vol = 0.05f;
+    
     
     // Start is called before the first frame update
     void Start()
@@ -50,9 +59,14 @@ public class RubyController : MonoBehaviour
         youlose = false;
         winmessage.SetActive(false);
         losemessage.SetActive(false);
-        score.text = "Score: " + myscore.ToString();
+        currentscene = SceneManager.GetActiveScene();
+        turnoffwalking = false;
+        if (currentscene.name != "Main2") {
+            score.text = "Score: " + myscore.ToString();
+        }
         losemusic.SetActive(false);
         winmusic.SetActive(false);
+        
        
         // currenthealth = 1;
     }
@@ -61,33 +75,39 @@ public class RubyController : MonoBehaviour
     void Update()
     {
         if (!youlose && !youwin) {
-            horizontal = Input.GetAxis("Horizontal");
-            vertical = Input.GetAxis("Vertical");
 
-            Vector2 move = new Vector2(horizontal, vertical);
+            //If you are not talking to cat, keep animating/walking
+            if (!turnoffwalking) {
 
-            if (!Mathf.Approximately(move.x,0.0f) || !Mathf.Approximately(move.y,0.0f)) {
-                lookdirection.Set(move.x,move.y);
-                lookdirection.Normalize();
+                horizontal = Input.GetAxis("Horizontal");
+                vertical = Input.GetAxis("Vertical");
 
-            }
+                Vector2 move = new Vector2(horizontal, vertical);
 
-            animator.SetFloat("Look X", lookdirection.x);
-            animator.SetFloat("Look Y", lookdirection.y);
-            animator.SetFloat("Speed", move.magnitude);
+                if (!Mathf.Approximately(move.x,0.0f) || !Mathf.Approximately(move.y,0.0f)) {
+                    lookdirection.Set(move.x,move.y);
+                    lookdirection.Normalize();
 
-            if (isinvincible) {
-                invincibletimer -= Time.deltaTime;
-                if (invincibletimer < 0) {
-                    isinvincible = false;
+                }
+
+                animator.SetFloat("Look X", lookdirection.x);
+                animator.SetFloat("Look Y", lookdirection.y);
+                animator.SetFloat("Speed", move.magnitude);
+
+                if (isinvincible) {
+                    invincibletimer -= Time.deltaTime;
+                    if (invincibletimer < 0) {
+                        isinvincible = false;
+                    }
+                }
+
+                if (Input.GetKeyDown(KeyCode.C)) {
+                    Launch();
+                    audiosource.PlayOneShot(throwsound);
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.C)) {
-                Launch();
-                audiosource.PlayOneShot(throwsound);
-            }
-
+            //Textboxes
             if (Input.GetKeyDown(KeyCode.X)) {
                 RaycastHit2D hit = Physics2D.Raycast(rb2d.position + Vector2.up * 0.2f, lookdirection, 1.5f, LayerMask.GetMask("NPC"));
                 if (hit.collider != null)
@@ -96,10 +116,38 @@ public class RubyController : MonoBehaviour
                     if (character != null) {
                         character.DisplayDialogue();
                     }
-                }
-            }
+                    CatScript cat = hit.collider.GetComponent<CatScript>();
+                    if (cat != null) {
 
+                        //If score is less than 6, dont go to next level.
+                        if (myscore < 6) {
+                            if (cat.catdialogue == false) {
+                                cat.catdialogue = true;
+                                turnoffwalking = true;
+                            } else {
+                                cat.catdialogue = false;
+                                turnoffwalking = false;
+                            }
+                        } else {
+                            //PUT SCENE CHANGE HERE
+                            SceneManager.LoadScene("Main2");
+                            currentscene = SceneManager.GetActiveScene();
+                            return;
+                            } 
+                        
+                        }
+                    
+                    }
+                    
+                }       
         }
+
+        //DEBUG
+        if (Input.GetKeyDown(KeyCode.P)) {
+            SceneManager.LoadScene("Main2");
+        }
+        
+        //If you lose
         if (youlose) {
             // audiosource.PlayOneShot(losemusic);
             losemusic.SetActive(true);
@@ -113,8 +161,10 @@ public class RubyController : MonoBehaviour
             }
         }
 
+        //If you win
         if (youwin) {
             // audiosource.PlayOneShot(winmusic);
+            audiosource.volume = vol;
             winmusic.SetActive(true);
             //gameObject.SetActive(false);
             Destroy(spritedisable);
@@ -126,12 +176,13 @@ public class RubyController : MonoBehaviour
             }
         }
         
+        //Quitting
         if (Input.GetKeyDown(KeyCode.Escape)) {
             Application.Quit();
         }
 
         //For winning
-        if (myscore >= 6) {
+        if (myscore >= 7) {
             youwin = true;
             winmessage.SetActive(true);
             bgm.SetActive(false);
@@ -143,6 +194,10 @@ public class RubyController : MonoBehaviour
             losemessage.SetActive(true);
             bgm.SetActive(false);
 
+        }
+
+        if (currentscene.name == "Main2") {
+            
         }
         
     }
@@ -183,7 +238,9 @@ public class RubyController : MonoBehaviour
 
     public void ChangeScore() {
             myscore += 1;
+            if (currentscene.name != "Main2") {
             score.text = "Score: " + myscore.ToString();
+        }
     }
 
     void Launch()
